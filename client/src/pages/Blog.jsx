@@ -1,112 +1,141 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { assets, blog_data, comments_data } from '../assets/assets';
+import { assets } from '../assets/assets';
 import Navbar from '../components/Navbar';
 import moment from 'moment';
 import Footer from '../components/Footer';
 import Loader from '../components/Loader';
+import { useAppContext } from '../context/AppContext';
+import toast from 'react-hot-toast';
 
 const Blog = () => {
     const { id } = useParams();
+    const { axios } = useAppContext();
+
     const [data, setData] = useState(null);
     const [comments, setComments] = useState([]);
-
     const [name, setName] = useState('');
     const [content, setContent] = useState('');
 
-    const fetchBlogData = () => {
-        console.log("ID from useParams:", id);
-        console.log("Blog Data:", blog_data);
-        const blog = blog_data.find(item => item._id.toString() === id);
-        if (blog) {
-            setData(blog);
-            console.log("Found Blog:", blog);
-        } else {
-            console.error("Blog not found for id:", id);
+    const fetchBlogData = async () => {
+        try {
+            const { data } = await axios.get(`/api/blog/${id}`);
+            data.success ? setData(data.blog) : toast.error(data.message);
+        } catch (error) {
+            toast.error(error.message);
         }
     };
 
-    const fetchComments = () => {
-        console.log("Comments Data:", comments_data);
-        if (Array.isArray(comments_data)) {
-            setComments(comments_data);
-        } else {
-            console.error("comments_data is not an array:", comments_data);
-            setComments([]);
+    const fetchComments = async () => {
+        try {
+            const { data } = await axios.post('/api/blog/comments', { blogId: id });
+            data.success ? setComments(data.comments) : toast.error(data.message);
+        } catch (error) {
+            toast.error(error.message);
         }
     };
 
-    const addComment = async (e) =>{
+    const addComment = async (e) => {
         e.preventDefault();
-    }
+        try {
+            const { data } = await axios.post('/api/blog/add-comment', { blog: id, name, content });
+            if (data.success) {
+                toast.success(data.message);
+                setName('');
+                setContent('');
+                fetchComments();
+            } else {
+                toast.error(data.message);
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    };
 
     useEffect(() => {
         fetchBlogData();
         fetchComments();
     }, [id]);
 
-    if (!data) {
-        return <Loader/>
-    }
-
-    console.log("Description:", data.description);
-    console.log("Gradient Background:", assets.gradientBackground);
-    console.log("Blog Image:", data.image);
-    console.log("User Icon:", assets.user_icon);
+    if (!data) return <Loader />;
 
     return (
-        <div className='relative'>
-            <img src={assets.gradientBackground} alt="" className='absolute -top-[50px] z-[-1] opacity-50' />
+        <div className="relative font-sans text-gray-700">
+            <img src={assets.gradientBackground} alt="" className="absolute top-0 left-0 w-full h-80 object-cover z-[-1] opacity-40" />
             <Navbar />
-            <div className='text-center mt-20 text-gray-600'>
-                <p className='text-primary py-4 font-medium'>Published on {moment(data.createdAt).format('MMMM Do YYYY')}</p>
-                <h1 className='text-2xl sm:text-5xl font-semibold max-w-2xl mx-auto text-gray-800'>{data.title}</h1>
-                <h2 className='my-5 max-w-lg truncate mx-auto'>{data.subTitle}</h2>
-                <p className='inline-block py-1 px-4 rounded-full mb-6 border text-sm border-primary/35 bg-primary/5 font-medium text-primary'>Michel Brown</p>
-            </div>
 
-            <div className='mx-5 max-w-5xl md:mx-auto my-10 mt-6'>
-                <img src={data.image} alt="" className='rounded-3xl mb-5' />
-                <div className='rich-text max-w-3xl mx-auto' dangerouslySetInnerHTML={{ __html: data.description }}></div>
+            {/* Header */}
+            <header className="mt-28 text-center px-4">
+                <p className="text-primary font-medium mb-2">Published on {moment(data.createdAt).format('MMMM Do YYYY')}</p>
+                <h1 className="text-3xl sm:text-5xl font-bold text-gray-900 max-w-4xl mx-auto">{data.title}</h1>
+                <h2 className="text-lg sm:text-xl mt-4 max-w-2xl mx-auto text-gray-600">{data.subTitle}</h2>
+                <div className="inline-block mt-6 py-1 px-4 rounded-full bg-primary/10 text-primary border border-primary/30 text-sm font-medium">Michel Brown</div>
+            </header>
 
-                {/* Comment section */}
-                <div className='mt-14 mb-10 max-w-3xl mx-auto'>
-                    <p className='font-semibold mb-4'>Comments ({comments.length})</p>
-                    <div className='flex flex-col gap-4'>
+            {/* Body */}
+            <main className="max-w-5xl mx-auto px-4 mt-10">
+                <img src={data.image} alt="Blog" className="rounded-2xl w-full shadow-md mb-8" />
+                <div className="prose lg:prose-xl mx-auto mb-16" dangerouslySetInnerHTML={{ __html: data.description }} />
+
+                {/* Comments */}
+                <section className="mb-16">
+                    <h3 className="text-xl font-semibold mb-4">Comments ({comments.length})</h3>
+                    <div className="space-y-6">
                         {comments.map((item, index) => (
-                            <div key={index} className='relative bg-primary/2 border border-primary/5 max-w-xl p-4 rounded text-gray-600'>
-                                <div className='flex items-center gap-2 mb-2'>
-                                    <img src={assets.user_icon} alt="" className='w-16' />
-                                    <p className='font-medium'>{item.name}</p>
+                            <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm">
+                                <div className="flex gap-4 mb-2 items-center">
+                                    <img src={assets.user_icon} alt="User" className="w-10 h-10 object-cover" />
+                                    <div>
+                                        <p className="font-medium">{item.name}</p>
+                                        <p className="text-xs text-gray-400">{moment(item.createdAt).fromNow()}</p>
+                                    </div>
                                 </div>
-                                <p className='text-sm max-w-md ml-8'>{item.content}</p>
-                                <div className='absolute right-4 bottom-3 flex items-center gap-2 text-xs'>
-                                    {moment(item.createdAt).fromNow()}
-                                </div>
+                                <p className="text-gray-700 ml-14">{item.content}</p>
                             </div>
                         ))}
                     </div>
-                </div>
-                            {/*add comment section*/}
-                <div className='max-w-3xl mx-auto'>
-                            <p className='font-semibold mb-4'>Add your comment</p>
-                            <form onSubmit={addComment} className='flex flex-col items-start gap-4 max-w-lg'>
-                                <input  onChange={()=> setName(e.target.value)} value={name} type='text' placeholder='Name' required className='w-full p-2 border border-gray-300 rounded outline-none'/>
-                                <textarea onChange={()=> setContent(e.target.value)} value={content} className='w-full p-2 border border-gray-300 rounded outline-none h-48' placeholder='Comment' required></textarea>
-                                <button type="submit" className='bg-primary text-white rounded p-2 px-8 hover:scale-102 transition-all cursor-pointer'>Submit</button>
-                            </form>
-                </div>
-                {/*share buttons*/}
-                <div className='my-24 max-w-3xl mx-auto'>
-                     <p className='font-semibold my-4'>Share this article on social media</p>
-                     <div className='flex'>
-                            <img src={assets.facebook_icon} width={50} alt="" />
-                            <img src={assets.twitter_icon} width={50} alt="" />
-                            <img src={assets.googleplus_icon} width={50} alt="" />
-                     </div>
-                </div>
-            </div>
-            <Footer/>
+                </section>
+
+                {/* Add Comment */}
+                <section className="mb-20">
+                    <h3 className="text-xl font-semibold mb-4">Add Your Comment</h3>
+                    <form onSubmit={addComment} className="space-y-4 max-w-lg">
+                        <input
+                            type="text"
+                            placeholder="Your Name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            required
+                            className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-primary"
+                        />
+                        <textarea
+                            placeholder="Write your comment..."
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                            required
+                            className="w-full p-3 h-40 border border-gray-300 rounded-lg outline-none focus:border-primary resize-none"
+                        />
+                        <button
+                            type="submit"
+                            className="bg-primary text-white font-medium py-2 px-6 rounded-lg shadow hover:bg-primary/90 transition duration-200"
+                        >
+                            Submit
+                        </button>
+                    </form>
+                </section>
+
+                {/* Share Section */}
+                <section className="text-center mb-32">
+                    <p className="text-lg font-semibold mb-4">Share this article</p>
+                    <div className="flex justify-center gap-6">
+                        <img src={assets.facebook_icon} alt="Facebook" className="w-10 hover:scale-110 transition" />
+                        <img src={assets.twitter_icon} alt="Twitter" className="w-10 hover:scale-110 transition" />
+                        <img src={assets.googleplus_icon} alt="Google+" className="w-10 hover:scale-110 transition" />
+                    </div>
+                </section>
+            </main>
+
+            <Footer />
         </div>
     );
 };
